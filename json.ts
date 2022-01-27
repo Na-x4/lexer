@@ -1,4 +1,8 @@
-import { LL1Lexer, LL1LexerController, LL1LexerGenerator } from "./ll1.ts";
+import {
+  LL1LexerStream,
+  LL1LexerController,
+  LL1LexerGenerator,
+} from "./ll1.ts";
 
 export type JSONToken =
   | { type: "comma" }
@@ -23,15 +27,47 @@ export type JSONToken =
 type JSONLexerController = LL1LexerController<string, JSONToken>;
 type JSONLexerGenerator = LL1LexerGenerator<string>;
 
-export class JSONLexer extends LL1Lexer<string, JSONToken> {
+export class JSONLexerStream {
+  readable: ReadableStream<JSONToken[]>;
+  writable: WritableStream<string>;
+
   constructor() {
-    super(json);
+    const lexer = new LL1LexerStream(json);
+    const transform = new TransformStream<string, string[]>({
+      transform(chunk, controller) {
+        controller.enqueue(Array.from(chunk));
+      },
+      flush(controller) {
+        controller.enqueue(["EOF"]);
+      },
+    });
+
+    transform.readable.pipeTo(lexer.writable);
+
+    this.readable = lexer.readable;
+    this.writable = transform.writable;
   }
 }
 
-export class StreamingJSONLexer extends LL1Lexer<string, JSONToken> {
+export class StreamingJSONLexerStream {
+  readable: ReadableStream<JSONToken[]>;
+  writable: WritableStream<string>;
+
   constructor() {
-    super(streamingJson);
+    const lexer = new LL1LexerStream(streamingJson);
+    const transform = new TransformStream<string, string[]>({
+      transform(chunk, controller) {
+        controller.enqueue(Array.from(chunk));
+      },
+      flush(controller) {
+        controller.enqueue(["EOF"]);
+      },
+    });
+
+    transform.readable.pipeTo(lexer.writable);
+
+    this.readable = lexer.readable;
+    this.writable = transform.writable;
   }
 }
 

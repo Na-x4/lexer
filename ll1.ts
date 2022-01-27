@@ -7,47 +7,37 @@ interface LL1LexerInstance<I, O> {
   controller: LL1LexerController<I, O>;
   generator: LL1LexerGenerator<I>;
 }
-export class LL1Lexer<I, O> {
-  #f;
+export class LL1LexerStream<I, O> {
   #instance: LL1LexerInstance<I, O> | null = null;
-  #done = false;
+  writable: WritableStream<I[]>;
+  readable: ReadableStream<O[]>;
 
   constructor(f: LL1LexerFunction<I, O>) {
-    this.#f = f;
-  }
+    const { writable, readable } = new TransformStream<I[], O[]>({
+      transform: (chunk, controller) => {
+        if (this.#instance === null) {
+          const controller = new LL1LexerController<I, O>(chunk);
+          let generator: LL1LexerGenerator<I>;
 
-  get done(): boolean {
-    return this.#done;
-  }
+          if (chunk.length > 0) {
+            generator = f(controller);
+          } else {
+            generator = (function* (controller) {
+              yield* controller.consume();
+              return yield* f(controller);
+            })(controller);
+          }
 
-  analyze(input: I[]) {
-    if (this.#done) {
-      throw new Error(`not expected "${input[0]}"`);
-    }
+          this.#instance = { controller, generator };
+        }
 
-    if (this.#instance === null) {
-      const controller = new LL1LexerController<I, O>(input);
-      let generator: LL1LexerGenerator<I>;
+        this.#instance.generator.next(chunk);
+        controller.enqueue(this.#instance.controller.moveTokens());
+      },
+    });
 
-      if (input.length > 0) {
-        generator = this.#f(controller);
-      } else {
-        const f = this.#f;
-        generator = (function* (controller) {
-          yield* controller.consume();
-          return yield* f(controller);
-        })(controller);
-      }
-
-      this.#instance = { controller, generator };
-    }
-
-    const { done } = this.#instance.generator.next(input);
-    if (done) {
-      this.#done = true;
-    }
-
-    return this.#instance.controller.moveTokens();
+    this.writable = writable;
+    this.readable = readable;
   }
 }
 
