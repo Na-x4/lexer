@@ -1,6 +1,5 @@
 import { readableStreamFromReader as toStream } from "https://deno.land/std/streams/conversion.ts";
-import { LL1LexerStream } from "./ll1.ts";
-import { JSONLexer } from "./json.ts";
+import { StreamingJSONLexer, JSONToken } from "./json.ts";
 
 async function* streamAsyncIterator<R>(stream: ReadableStream<R>) {
   const reader = stream.getReader();
@@ -15,16 +14,19 @@ async function* streamAsyncIterator<R>(stream: ReadableStream<R>) {
   }
 }
 
+const lexer = new StreamingJSONLexer();
 const stream = toStream(Deno.stdin)
   .pipeThrough(new TextDecoderStream())
   .pipeThrough(
-    new TransformStream({
+    new TransformStream<string, JSONToken[]>({
       transform(chunk, controller) {
-        controller.enqueue(Array.from(chunk));
+        controller.enqueue(lexer.analyze(Array.from(chunk)));
+      },
+      flush(controller) {
+        controller.enqueue(lexer.analyze(["EOF"]));
       },
     })
-  )
-  .pipeThrough(new LL1LexerStream(() => new JSONLexer()));
+  );
 
 for await (const tokens of streamAsyncIterator(stream)) {
   tokens.forEach((token) => {

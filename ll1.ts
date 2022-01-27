@@ -3,32 +3,6 @@ export type LL1LexerFunction<I, O> = (
   controller: LL1LexerController<I, O>
 ) => LL1LexerGenerator<I>;
 
-export class LL1LexerStream<I, O> extends TransformStream<I[], O[]> {
-  constructor(lexerFactory: () => LL1Lexer<I, O>) {
-    let lexer = lexerFactory();
-    super({
-      transform(chunk, controller) {
-        let buffer = chunk.concat();
-        while (buffer.length > 0) {
-          const tokens = lexer.analyze(buffer);
-          controller.enqueue(tokens);
-          if (lexer.done) {
-            const result = lexer.end();
-            controller.enqueue(result.tokens);
-
-            lexer = lexerFactory();
-            buffer = result.buffer;
-          }
-        }
-      },
-      flush(controller) {
-        const { tokens } = lexer.end();
-        controller.enqueue(tokens);
-      },
-    });
-  }
-}
-
 interface LL1LexerInstance<I, O> {
   controller: LL1LexerController<I, O>;
   generator: LL1LexerGenerator<I>;
@@ -37,11 +11,9 @@ export class LL1Lexer<I, O> {
   #f;
   #instance: LL1LexerInstance<I, O> | null = null;
   #done = false;
-  #eof: I;
 
-  constructor(f: LL1LexerFunction<I, O>, eof: I) {
+  constructor(f: LL1LexerFunction<I, O>) {
     this.#f = f;
-    this.#eof = eof;
   }
 
   get done(): boolean {
@@ -50,7 +22,7 @@ export class LL1Lexer<I, O> {
 
   analyze(input: I[]) {
     if (this.#done) {
-      return [];
+      throw new Error(`not expected "${input[0]}"`);
     }
 
     if (this.#instance === null) {
@@ -76,22 +48,6 @@ export class LL1Lexer<I, O> {
     }
 
     return this.#instance.controller.moveTokens();
-  }
-
-  end() {
-    if (this.#done && this.#instance !== null) {
-      const buffer = this.#instance.controller.buffer;
-      return { buffer, tokens: [] };
-    }
-
-    const tokens = this.analyze([this.#eof]);
-
-    if (!this.#done) {
-      throw new Error("Unexpected EOF");
-    } else {
-      const buffer = this.#instance?.controller?.buffer ?? [];
-      return { buffer, tokens };
-    }
   }
 }
 
@@ -125,6 +81,13 @@ export class LL1LexerController<I, O> {
     this.#buffer.shift();
     while (this.#buffer.length == 0) {
       this.#buffer = yield;
+    }
+  }
+
+  end() {
+    this.#buffer.shift();
+    if (this.#buffer.length > 0) {
+      throw new Error("Unexpected %o", this.#buffer[0]);
     }
   }
 

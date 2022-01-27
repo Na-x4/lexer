@@ -1,6 +1,6 @@
 import { LL1Lexer, LL1LexerController, LL1LexerGenerator } from "./ll1.ts";
 
-export type JsonToken =
+export type JSONToken =
   | { type: "comma" }
   | { type: "colon" }
   | { type: "objectStart" }
@@ -20,12 +20,18 @@ export type JsonToken =
   | { type: "false" }
   | { type: "null" };
 
-type JSONLexerController = LL1LexerController<string, JsonToken>;
+type JSONLexerController = LL1LexerController<string, JSONToken>;
 type JSONLexerGenerator = LL1LexerGenerator<string>;
 
-export class JSONLexer extends LL1Lexer<string, JsonToken> {
+export class JSONLexer extends LL1Lexer<string, JSONToken> {
   constructor() {
-    super(json, "EOF");
+    super(json);
+  }
+}
+
+export class StreamingJSONLexer extends LL1Lexer<string, JSONToken> {
+  constructor() {
+    super(streamingJson);
   }
 }
 
@@ -41,8 +47,19 @@ const hexChars = digitChars.concat(
 const numberFirstChars = digitChars.concat(["-"]);
 const wsChars = [" ", "\n", "\r", "\t"];
 
+function* streamingJson(controller: JSONLexerController): JSONLexerGenerator {
+  while (controller.nextChar() != "EOF") {
+    yield* element(controller);
+  }
+  controller.end();
+}
+
 function* json(controller: JSONLexerController): JSONLexerGenerator {
   yield* element(controller);
+  if (controller.nextChar() != "EOF") {
+    throw new Error(`not expected "${controller.nextChar()}"`);
+  }
+  controller.end();
 }
 
 function* value(controller: JSONLexerController): JSONLexerGenerator {
