@@ -17,12 +17,13 @@ export type JSONToken =
   | { type: "numberStart" }
   | { type: "numberEnd" }
   | { type: "digit"; value: string }
-  | { type: "sign"; value: string }
+  | { type: "sign"; value: "+" | "-" }
   | { type: "decimalPoint" }
   | { type: "exponent" }
   | { type: "true" }
   | { type: "false" }
-  | { type: "null" };
+  | { type: "null" }
+  | { type: "EOF" };
 
 type JSONLexerController = LL1LexerController<string, JSONToken>;
 type JSONLexerGenerator<R = void> = LL1LexerGenerator<string, R>;
@@ -87,6 +88,7 @@ function* streamingJson(controller: JSONLexerController): JSONLexerGenerator {
   while (controller.nextChar() != "EOF") {
     yield* element(controller);
   }
+  controller.pushToken({ type: "EOF" });
   controller.end();
 }
 
@@ -95,6 +97,7 @@ function* json(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() != "EOF") {
     throw new Error(`not expected "${controller.nextChar()}"`);
   }
+  controller.pushToken({ type: "EOF" });
   controller.end();
 }
 
@@ -344,7 +347,7 @@ function* integer(controller: JSONLexerController): JSONLexerGenerator {
       yield* digits(controller);
     }
   } else if (controller.nextChar() == "-") {
-    controller.pushToken({ type: "sign", value: controller.nextChar() });
+    controller.pushToken({ type: "sign", value: "-" });
     yield* controller.consume();
 
     if (controller.nextChar() == "0") {
@@ -400,8 +403,9 @@ function* exponent(controller: JSONLexerController): JSONLexerGenerator {
 }
 
 function* sign(controller: JSONLexerController): JSONLexerGenerator {
-  if (controller.nextChar() == "+" || controller.nextChar() == "-") {
-    controller.pushToken({ type: "sign", value: controller.nextChar() });
+  const nextChar = controller.nextChar();
+  if (nextChar == "+" || nextChar == "-") {
+    controller.pushToken({ type: "sign", value: nextChar });
     yield* controller.consume();
   }
 }
