@@ -2,7 +2,7 @@ import {
   LL1LexerStream,
   LL1LexerController,
   LL1LexerGenerator,
-} from "./ll1.ts";
+} from "../ll1.ts";
 
 export type JSONToken =
   | { type: "comma" }

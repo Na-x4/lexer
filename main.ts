@@ -1,5 +1,5 @@
 import { readableStreamFromReader as toStream } from "https://deno.land/std/streams/conversion.ts";
-import { StreamingJSONLexerStream } from "./json.ts";
+import { StreamingJSONLexerStream } from "./json/lexer.ts";
 
 async function* streamAsyncIterator<R>(stream: ReadableStream<R>) {
   const reader = stream.getReader();
