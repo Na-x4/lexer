@@ -1,23 +1,23 @@
-export type LL1LexerGenerator<I> = Generator<void, void, I[]>;
-export type LL1LexerFunction<I, O> = (
+export type LL1LexerGenerator<I, R> = Generator<void, R, I[]>;
+export type LL1LexerFunction<I, O, R> = (
   controller: LL1LexerController<I, O>
-) => LL1LexerGenerator<I>;
+) => LL1LexerGenerator<I, R>;
 
 interface LL1LexerInstance<I, O> {
   controller: LL1LexerController<I, O>;
-  generator: LL1LexerGenerator<I>;
+  generator: LL1LexerGenerator<I, void>;
 }
 export class LL1LexerStream<I, O> {
   #instance: LL1LexerInstance<I, O> | null = null;
   writable: WritableStream<I[]>;
   readable: ReadableStream<O[]>;
 
-  constructor(f: LL1LexerFunction<I, O>) {
+  constructor(f: LL1LexerFunction<I, O, void>) {
     const { writable, readable } = new TransformStream<I[], O[]>({
       transform: (chunk, controller) => {
         if (this.#instance === null) {
           const controller = new LL1LexerController<I, O>(chunk);
-          let generator: LL1LexerGenerator<I>;
+          let generator: LL1LexerGenerator<I, void>;
 
           if (chunk.length > 0) {
             generator = f(controller);

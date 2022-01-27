@@ -25,7 +25,7 @@ export type JSONToken =
   | { type: "null" };
 
 type JSONLexerController = LL1LexerController<string, JSONToken>;
-type JSONLexerGenerator = LL1LexerGenerator<string>;
+type JSONLexerGenerator<R = void> = LL1LexerGenerator<string, R>;
 
 export class JSONLexerStream {
   readable: ReadableStream<JSONToken[]>;
