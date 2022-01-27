@@ -1,33 +1,35 @@
-export type LL1LexerGenerator = Generator<void, void, string[]>;
-export type LL1LexerFunction<T> = (
-  controller: LL1LexerController<T>
-) => LL1LexerGenerator;
+export type LL1LexerGenerator<I> = Generator<void, void, I[]>;
+export type LL1LexerFunction<I, O> = (
+  controller: LL1LexerController<I, O>
+) => LL1LexerGenerator<I>;
 
-type LL1LexerInstance<T> = {
-  controller: LL1LexerController<T>;
-  generator: LL1LexerGenerator;
+type LL1LexerInstance<I, O> = {
+  controller: LL1LexerController<I, O>;
+  generator: LL1LexerGenerator<I>;
 };
-export class LL1Lexer<T> {
+export class LL1Lexer<I, O> {
   #f;
-  #instance: LL1LexerInstance<T> | null = null;
+  #instance: LL1LexerInstance<I, O> | null = null;
   #done = false;
+  #eof: I;
 
-  constructor(f: LL1LexerFunction<T>) {
+  constructor(f: LL1LexerFunction<I, O>, eof: I) {
     this.#f = f;
+    this.#eof = eof;
   }
 
   get done(): boolean {
     return this.#done;
   }
 
-  analyze(input: string[]) {
+  analyze(input: I[]) {
     if (this.#done) {
       return [];
     }
 
     if (this.#instance === null) {
-      const controller = new LL1LexerController<T>(input);
-      let generator: LL1LexerGenerator;
+      const controller = new LL1LexerController<I, O>(input);
+      let generator: LL1LexerGenerator<I>;
 
       if (input.length > 0) {
         generator = this.#f(controller);
@@ -56,7 +58,7 @@ export class LL1Lexer<T> {
       return { buffer, tokens: [] };
     }
 
-    const tokens = this.analyze(["EOF"]);
+    const tokens = this.analyze([this.#eof]);
 
     if (!this.#done) {
       throw new Error("Unexpected EOF");
@@ -67,29 +69,29 @@ export class LL1Lexer<T> {
   }
 }
 
-export class LL1LexerController<T> {
-  #buffer: string[] = [];
-  #tokens: T[] = [];
+export class LL1LexerController<I, O> {
+  #buffer: I[] = [];
+  #tokens: O[] = [];
 
-  constructor(input: string[]) {
+  constructor(input: I[]) {
     this.#buffer = input;
   }
 
-  nextChar(): string {
+  nextChar(): I {
     if (this.#buffer.length == 0) {
       throw new Error("Buffer is empty");
     }
     return this.#buffer[0];
   }
 
-  moveTokens(): T[] {
+  moveTokens(): O[] {
     const tokens = this.#tokens;
     this.#tokens = [];
 
     return tokens;
   }
 
-  get buffer(): string[] {
+  get buffer(): I[] {
     return this.#buffer;
   }
 
@@ -100,7 +102,7 @@ export class LL1LexerController<T> {
     }
   }
 
-  pushToken(token: T) {
+  pushToken(token: O) {
     this.#tokens.push(token);
   }
 }

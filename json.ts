@@ -20,11 +20,12 @@ export type JsonToken =
   | { type: "false" }
   | { type: "null" };
 
-type JSONLexerController = LL1LexerController<JsonToken>;
+type JSONLexerController = LL1LexerController<string, JsonToken>;
+type JSONLexerGenerator = LL1LexerGenerator<string>;
 
-export class JSONLexer extends LL1Lexer<JsonToken> {
+export class JSONLexer extends LL1Lexer<string, JsonToken> {
   constructor() {
-    super(json);
+    super(json, "EOF");
   }
 }
 
@@ -40,11 +41,11 @@ const hexChars = digitChars.concat(
 const numberFirstChars = digitChars.concat(["-"]);
 const wsChars = [" ", "\n", "\r", "\t"];
 
-function* json(controller: JSONLexerController): LL1LexerGenerator {
+function* json(controller: JSONLexerController): JSONLexerGenerator {
   yield* element(controller);
 }
 
-function* value(controller: JSONLexerController): LL1LexerGenerator {
+function* value(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() == objectFirstChar) {
     yield* object(controller);
   } else if (controller.nextChar() == arrayFirstChar) {
@@ -88,7 +89,7 @@ function* value(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* object(controller: JSONLexerController): LL1LexerGenerator {
+function* object(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() != objectFirstChar) {
     throw new Error(`not expected "${controller.nextChar()}"`);
   }
@@ -109,7 +110,7 @@ function* object(controller: JSONLexerController): LL1LexerGenerator {
   yield* controller.consume();
 }
 
-function* members(controller: JSONLexerController): LL1LexerGenerator {
+function* members(controller: JSONLexerController): JSONLexerGenerator {
   yield* member(controller);
 
   while (controller.nextChar() == ",") {
@@ -120,7 +121,7 @@ function* members(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* member(controller: JSONLexerController): LL1LexerGenerator {
+function* member(controller: JSONLexerController): JSONLexerGenerator {
   yield* ws(controller);
   yield* str(controller);
   yield* ws(controller);
@@ -134,7 +135,7 @@ function* member(controller: JSONLexerController): LL1LexerGenerator {
   yield* element(controller);
 }
 
-function* array(controller: JSONLexerController): LL1LexerGenerator {
+function* array(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() != arrayFirstChar) {
     throw new Error(`not expected "${controller.nextChar()}"`);
   }
@@ -155,7 +156,7 @@ function* array(controller: JSONLexerController): LL1LexerGenerator {
   return yield* controller.consume();
 }
 
-function* elements(controller: JSONLexerController): LL1LexerGenerator {
+function* elements(controller: JSONLexerController): JSONLexerGenerator {
   yield* element(controller);
 
   while (controller.nextChar() == ",") {
@@ -166,13 +167,13 @@ function* elements(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* element(controller: JSONLexerController): LL1LexerGenerator {
+function* element(controller: JSONLexerController): JSONLexerGenerator {
   yield* ws(controller);
   yield* value(controller);
   yield* ws(controller);
 }
 
-function* str(controller: JSONLexerController): LL1LexerGenerator {
+function* str(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() != '"') {
     throw new Error(`not expected "${controller.nextChar()}"`);
   }
@@ -188,13 +189,13 @@ function* str(controller: JSONLexerController): LL1LexerGenerator {
   yield* controller.consume();
 }
 
-function* characters(controller: JSONLexerController): LL1LexerGenerator {
+function* characters(controller: JSONLexerController): JSONLexerGenerator {
   while (controller.nextChar() != '"') {
     yield* character(controller);
   }
 }
 
-function* character(controller: JSONLexerController): LL1LexerGenerator {
+function* character(controller: JSONLexerController): JSONLexerGenerator {
   const nextChar = controller.nextChar();
   const codePoint = nextChar.charCodeAt(0);
   if (codePoint >= 0x0 && codePoint < 0x20) {
@@ -211,7 +212,7 @@ function* character(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* escape(controller: JSONLexerController): LL1LexerGenerator {
+function* escape(controller: JSONLexerController): JSONLexerGenerator {
   switch (controller.nextChar()) {
     case '"':
       controller.pushToken({ type: "character", value: '"' });
@@ -273,7 +274,7 @@ function* escape(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* num(controller: JSONLexerController): LL1LexerGenerator {
+function* num(controller: JSONLexerController): JSONLexerGenerator {
   controller.pushToken({ type: "numberStart" });
   yield* integer(controller);
   yield* fraction(controller);
@@ -281,7 +282,7 @@ function* num(controller: JSONLexerController): LL1LexerGenerator {
   controller.pushToken({ type: "numberEnd" });
 }
 
-function* integer(controller: JSONLexerController): LL1LexerGenerator {
+function* integer(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() == "0") {
     yield* digit(controller);
   } else if (oneNineChars.includes(controller.nextChar())) {
@@ -308,7 +309,7 @@ function* integer(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* digits(controller: JSONLexerController): LL1LexerGenerator {
+function* digits(controller: JSONLexerController): JSONLexerGenerator {
   yield* digit(controller);
 
   while (digitChars.includes(controller.nextChar())) {
@@ -316,7 +317,7 @@ function* digits(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* digit(controller: JSONLexerController): LL1LexerGenerator {
+function* digit(controller: JSONLexerController): JSONLexerGenerator {
   const nextChar = controller.nextChar();
   if (digitChars.includes(nextChar)) {
     controller.pushToken({ type: "digit", value: nextChar });
@@ -326,7 +327,7 @@ function* digit(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* fraction(controller: JSONLexerController): LL1LexerGenerator {
+function* fraction(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() == ".") {
     controller.pushToken({ type: "decimalPoint" });
     yield* controller.consume();
@@ -335,7 +336,7 @@ function* fraction(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* exponent(controller: JSONLexerController): LL1LexerGenerator {
+function* exponent(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() == "E" || controller.nextChar() == "e") {
     controller.pushToken({ type: "exponent" });
     yield* controller.consume();
@@ -345,14 +346,14 @@ function* exponent(controller: JSONLexerController): LL1LexerGenerator {
   }
 }
 
-function* sign(controller: JSONLexerController): LL1LexerGenerator {
+function* sign(controller: JSONLexerController): JSONLexerGenerator {
   if (controller.nextChar() == "+" || controller.nextChar() == "-") {
     controller.pushToken({ type: "sign", value: controller.nextChar() });
     yield* controller.consume();
   }
 }
 
-function* ws(controller: JSONLexerController): LL1LexerGenerator {
+function* ws(controller: JSONLexerController): JSONLexerGenerator {
   while (wsChars.includes(controller.nextChar())) {
     yield* controller.consume();
   }
