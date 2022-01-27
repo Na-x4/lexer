@@ -3,10 +3,36 @@ export type LL1LexerFunction<I, O> = (
   controller: LL1LexerController<I, O>
 ) => LL1LexerGenerator<I>;
 
-type LL1LexerInstance<I, O> = {
+export class LL1LexerStream<I, O> extends TransformStream<I[], O[]> {
+  constructor(lexerFactory: () => LL1Lexer<I, O>) {
+    let lexer = lexerFactory();
+    super({
+      transform(chunk, controller) {
+        let buffer = chunk.concat();
+        while (buffer.length > 0) {
+          const tokens = lexer.analyze(buffer);
+          controller.enqueue(tokens);
+          if (lexer.done) {
+            const result = lexer.end();
+            controller.enqueue(result.tokens);
+
+            lexer = lexerFactory();
+            buffer = result.buffer;
+          }
+        }
+      },
+      flush(controller) {
+        const { tokens } = lexer.end();
+        controller.enqueue(tokens);
+      },
+    });
+  }
+}
+
+interface LL1LexerInstance<I, O> {
   controller: LL1LexerController<I, O>;
   generator: LL1LexerGenerator<I>;
-};
+}
 export class LL1Lexer<I, O> {
   #f;
   #instance: LL1LexerInstance<I, O> | null = null;
